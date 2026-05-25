@@ -3,6 +3,8 @@
 
 Orbit B-hyve component for [Home Assistant](https://www.home-assistant.io/).
 
+> **Forked from [sebr/bhyve-home-assistant](https://github.com/sebr/bhyve-home-assistant)** — extended with a `bhyve.start_multi_zone` service that waters multiple zones in sequence using a single WebSocket `change_mode` message.
+
 <!-- If this integration has been useful to you, please consider chipping in and buying me a coffee! -->
 
 <a href="https://www.buymeacoffee.com/sebr" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee"></a>
