@@ -220,16 +220,33 @@ A **device mode** `select` entity is created for each `sprinkler_timer` device, 
 
 This integration provides the following services:
 
-| Service                           | Parameters                                                                                                                                                  | Description                                                      |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `bhyve.start_watering`            | `entity_id` - zone(s) entity to start watering. This should be a reference to a zone valve entity <br/> `minutes` - number of minutes to water for         | Start watering a zone for a specific number of minutes           |
-| `bhyve.stop_watering`             | `entity_id` - zone(s) entity to stop watering. This should be a reference to a zone valve entity                                                           | Stop watering a zone                                             |
-| `bhyve.enable_rain_delay`         | `entity_id` - device to enable a rain delay. This can reference either a zone valve or rain delay switch <br/> `hours` - number of hours to enable a rain delay   | Enable a rain delay for a device for a specified number of hours |
-| `bhyve.disable_rain_delay`        | `entity_id` - device to disable a rain delay. This can reference either a zone valve or rain delay switch                                                          | Cancel a rain delay on a given device                            |
-| `bhyve.set_manual_preset_runtime` | `entity_id` - zone(s) entity to set the preset runtime. This should be a reference to a zone valve entity <br/> `minutes` - number of minutes to water for | Set the default time a zone is watered for when the valve is opened. Support for this service appears to be patchy, and it has been difficult to identify the devices or under which conditions it works      |
+| Service                                  | Parameters                                                                                                                                                  | Description                                                      |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| `bhyve.start_watering`                   | `entity_id` - zone(s) entity to start watering. This should be a reference to a zone valve entity <br/> `minutes` - number of minutes to water for         | Start watering a zone for a specific number of minutes           |
+| `bhyve.stop_watering`                    | `entity_id` - zone(s) entity to stop watering. This should be a reference to a zone valve entity                                                           | Stop watering a zone                                             |
+| `bhyve.enable_rain_delay`                | `entity_id` - device to enable a rain delay. This can reference either a zone valve or rain delay switch <br/> `hours` - number of hours to enable a rain delay   | Enable a rain delay for a device for a specified number of hours |
+| `bhyve.disable_rain_delay`               | `entity_id` - device to disable a rain delay. This can reference either a zone valve or rain delay switch                                                   | Cancel a rain delay on a given device                            |
+| `bhyve.set_manual_preset_runtime`        | `entity_id` - zone(s) entity to set the preset runtime. This should be a reference to a zone valve entity <br/> `minutes` - number of minutes to water for | Set the default time a zone is watered for when the valve is opened. Support for this service appears to be patchy, and it has been difficult to identify the devices or under which conditions it works      |
 | `bhyve.set_smart_watering_soil_moisture` | `entity_id` - zone(s) entity to set the moisture level for. This should be a reference to a zone valve entity <br/> `percentage` - soil moisture level between 0 - 100 | Set Smart Watering soil moisture level for a zone     |
-| `bhyve.start_program` | `entity_id` - program entity to start. This should be a reference to a program switch entity | Starts a pre-configured watering program. Watering programs cannot be created via this integration and must first be set up in the B-Hyve app |
-| `bhyve.update_program` | `entity_id` - program switch to update <br/> `start_times` - _(optional)_ list of watering start times in `HH:MM` format <br/> `frequency` - _(optional)_ frequency configuration object (must include a `type`, known values: `days`, `interval`) <br/> `budget` - _(optional)_ watering budget as a percentage (0-200) | Update the configuration of an existing non-smart program. At least one of `start_times`, `frequency` or `budget` must be provided |
+| `bhyve.start_program`                    | `entity_id` - program entity to start. This should be a reference to a program switch entity | Starts a pre-configured watering program. Watering programs cannot be created via this integration and must first be set up in the B-Hyve app |
+| `bhyve.update_program`                   | `entity_id` - program switch to update <br/> `start_times` - _(optional)_ list of watering start times in `HH:MM` format <br/> `frequency` - _(optional)_ frequency configuration object (must include a `type`, known values: `days`, `interval`) <br/> `budget` - _(optional)_ watering budget as a percentage (0-200) | Update the configuration of an existing non-smart program. At least one of `start_times`, `frequency` or `budget` must be provided |
+| `bhyve.start_multi_zone`                 | `stations` - ordered list of `{entity_id, minutes}` entries | Water multiple zones in sequence using a single WebSocket command. Zones on the same device run back-to-back without gaps. Zones on different devices are started in parallel. |
+
+### `bhyve.start_multi_zone` example
+
+```yaml
+action: bhyve.start_multi_zone
+data:
+  stations:
+    - entity_id: valve.front_yard_zone
+      minutes: 5
+    - entity_id: valve.back_yard_zone
+      minutes: 10
+    - entity_id: valve.side_yard_zone
+      minutes: 7
+```
+
+Zones are watered in the order listed. All zones belonging to the same physical B-hyve device are grouped into a single `change_mode` WebSocket message, so the hub transitions between them without any gap. If you have zones on multiple devices, each device receives its own message and they run concurrently.
 
 ### `bhyve.update_program` example
 
