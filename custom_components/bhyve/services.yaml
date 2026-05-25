@@ -74,3 +74,24 @@ update_program:
     budget:
       description: Watering budget as a percentage (0-200). Scales run times up or down
       example: 50
+
+start_multi_zone:
+  description: >
+    Start watering multiple zones in sequence using a single change_mode WebSocket
+    message. Zones are watered in the order listed. All zones on the same physical
+    device are grouped into one message; zones on different devices each get their
+    own message sent in parallel.
+  fields:
+    stations:
+      description: >
+        Ordered list of zones to water. Each entry requires an entity_id (the
+        BHyve valve entity for that zone) and a minutes value (how long to run
+        that zone).
+      example: |
+        stations:
+          - entity_id: valve.front_yard_zone
+            minutes: 5
+          - entity_id: valve.back_yard_zone
+            minutes: 10
+          - entity_id: valve.side_yard_zone
+            minutes: 7

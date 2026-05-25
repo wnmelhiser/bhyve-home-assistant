@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import datetime
 import logging
 from dataclasses import dataclass
@@ -30,7 +31,7 @@ from .util import orbit_time_to_local_time
 
 if TYPE_CHECKING:
     from homeassistant.config_entries import ConfigEntry
-    from homeassistant.core import HomeAssistant
+    from homeassistant.core import HomeAssistant, ServiceCall
     from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
     from .coordinator import BHyveDataUpdateCoordinator
@@ -102,6 +103,28 @@ SERVICE_STOP_WATERING = "stop_watering"
 SERVICE_SET_MANUAL_PRESET_RUNTIME = "set_manual_preset_runtime"
 SERVICE_SET_SMART_WATERING_SOIL_MOISTURE = "set_smart_watering_soil_moisture"
 SERVICE_START_PROGRAM = "start_program"
+SERVICE_START_MULTI_ZONE = "start_multi_zone"
+
+# Multi-zone service attributes
+ATTR_STATIONS = "stations"
+
+# Schema for a single station entry inside the multi-zone service call
+STATION_ENTRY_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_ENTITY_ID): cv.entity_id,
+        vol.Required(ATTR_MINUTES): vol.All(vol.Coerce(int), vol.Range(min=1)),
+    }
+)
+
+START_MULTI_ZONE_SCHEMA = vol.Schema(
+    {
+        vol.Required(ATTR_STATIONS): vol.All(
+            cv.ensure_list,
+            [STATION_ENTRY_SCHEMA],
+            vol.Length(min=1),
+        ),
+    }
+)
 
 
 SERVICE_TO_METHOD = {
@@ -146,7 +169,7 @@ VALVE_DESCRIPTION = BHyveValveEntityDescription(
 )
 
 
-async def async_setup_entry(
+async def async_setup_entry(  # noqa: PLR0915
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up the BHyve valve platform from a config entry."""
@@ -234,6 +257,84 @@ async def async_setup_entry(
         schema = details["schema"]
         hass.services.async_register(
             DOMAIN, service, async_service_handler, schema=schema
+        )
+
+    # Register the multi-zone service once (shared across all config entries).
+    if not hass.services.has_service(DOMAIN, SERVICE_START_MULTI_ZONE):
+
+        async def async_start_multi_zone_service(call: ServiceCall) -> None:
+            """
+            Start watering multiple zones in sequence on one or more devices.
+
+            Each entry in *stations* resolves to a BHyveZoneValve entity.  All
+            stations that belong to the same physical device are grouped into a
+            single ``change_mode`` WebSocket message so the hub sequences them
+            without gaps.  Stations for different devices each get their own
+            message, sent in parallel.
+            """
+            stations_data: list[dict] = call.data.get(ATTR_STATIONS, [])
+
+            valve_component = hass.data.get(VALVE_DOMAIN)
+            if valve_component is None:
+                _LOGGER.warning(
+                    "Valve component not available for %s", SERVICE_START_MULTI_ZONE
+                )
+                return
+
+            # Map device_id → list of {station, run_time} and the client to use.
+            device_stations: dict[str, list[dict]] = {}
+            device_clients: dict[str, Any] = {}
+
+            for station_entry in stations_data:
+                entity_id: str = station_entry[ATTR_ENTITY_ID]
+                minutes: int = station_entry[ATTR_MINUTES]
+
+                entity = valve_component.get_entity(entity_id)
+                if not isinstance(entity, BHyveZoneValve):
+                    _LOGGER.error(
+                        "Entity %s is not a BHyve zone valve - skipping", entity_id
+                    )
+                    continue
+
+                device_id: str = entity._device_id  # noqa: SLF001
+                zone_id: str = entity._zone_id  # noqa: SLF001
+
+                if device_id not in device_stations:
+                    device_stations[device_id] = []
+                    device_clients[device_id] = entity.coordinator.client
+
+                device_stations[device_id].append(
+                    {"station": zone_id, "run_time": minutes}
+                )
+
+            if not device_stations:
+                _LOGGER.warning(
+                    "No valid BHyve zone valves found in %s call - nothing sent",
+                    SERVICE_START_MULTI_ZONE,
+                )
+                return
+
+            # Fire one change_mode per device (in parallel when multiple devices).
+            async def _send(dev_id: str) -> None:
+                try:
+                    await device_clients[dev_id].send_multi_station_watering(
+                        dev_id, device_stations[dev_id]
+                    )
+                except BHyveError as err:
+                    _LOGGER.warning(
+                        "Failed to send %s for device %s: %s",
+                        SERVICE_START_MULTI_ZONE,
+                        dev_id,
+                        err,
+                    )
+
+            await asyncio.gather(*[_send(dev_id) for dev_id in device_stations])
+
+        hass.services.async_register(
+            DOMAIN,
+            SERVICE_START_MULTI_ZONE,
+            async_start_multi_zone_service,
+            schema=START_MULTI_ZONE_SCHEMA,
         )
 
 

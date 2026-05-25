@@ -1,6 +1,7 @@
 """Define an object to interact with the REST API."""
 
 import asyncio
+import datetime
 import logging
 import re
 import time
@@ -323,4 +324,28 @@ class BHyveClient:
             "seconds": minutes * 60,
         }
         _LOGGER.info("Setting manual preset runtime: %s", payload)
+        await self.send_message(payload)
+
+    async def send_multi_station_watering(
+        self,
+        device_id: str,
+        stations: list[dict[str, Any]],
+    ) -> None:
+        """
+        Send a multi-station change_mode message to water zones in sequence.
+
+        Each entry in *stations* must be a dict with keys:
+          - ``station``: the zone station number/ID
+          - ``run_time``: minutes to water that zone
+        """
+        now = datetime.datetime.now()  # noqa: DTZ005
+        iso_time = now.strftime("%Y-%m-%dT%H:%M:%SZ")
+        payload: dict[str, Any] = {
+            "event": "change_mode",
+            "mode": "manual",
+            "device_id": device_id,
+            "timestamp": iso_time,
+            "stations": stations,
+        }
+        _LOGGER.info("Sending multi-station watering: %s", payload)
         await self.send_message(payload)
