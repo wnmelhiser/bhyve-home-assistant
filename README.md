@@ -7,8 +7,6 @@ Orbit B-hyve component for [Home Assistant](https://www.home-assistant.io/).
 
 <!-- If this integration has been useful to you, please consider chipping in and buying me a coffee! -->
 
-<a href="https://www.buymeacoffee.com/sebr" target="_blank"><img src="https://www.buymeacoffee.com/assets/img/custom_images/orange_img.png" alt="Buy Me A Coffee"></a>
-
 ## Supported Devices
 
 This integration works with:
