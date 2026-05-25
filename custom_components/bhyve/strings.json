@@ -155,6 +155,16 @@
           "description": "Watering budget as a percentage (0-200). Scales run times up or down"
         }
       }
+    },
+    "start_multi_zone": {
+      "name": "Start multi-zone watering",
+      "description": "Water multiple zones in sequence using a single command. Zones on the same device run back-to-back without gaps.",
+      "fields": {
+        "stations": {
+          "name": "Stations",
+          "description": "Ordered list of zones to water. Each entry needs an entity_id (the valve entity) and minutes (how long to run)."
+        }
+      }
     }
   },
   "entity": {
